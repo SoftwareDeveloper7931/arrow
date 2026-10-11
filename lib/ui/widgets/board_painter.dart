@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../../models/arrow.dart';
 import '../../models/board.dart';
 import '../../models/direction.dart';
+import '../../models/shape_mask.dart';
+import '../../theme/app_colors.dart';
 import '../../theme/game_theme.dart';
 
 /// Single-pass custom painter that renders the entire minimalist silhouette board.
@@ -14,6 +16,7 @@ class BoardPainter extends CustomPainter {
   final Board board;
   final GameTheme theme;
   final double cellSize;
+  final ShapeMask? mask;
   final bool showDotGrid;
   final Arrow? animatingArrow;
   final double animationProgress; // 0.0 to 1.0
@@ -25,13 +28,11 @@ class BoardPainter extends CustomPainter {
   final Set<String> guidanceArrowIds;
   final bool isCompletedSilhouette;
 
-  // Cached paths for non-animating arrows to maximize 60fps rendering performance
-  static final Map<String, Path> _pathCache = {};
-
   BoardPainter({
     required this.board,
     required this.theme,
     required this.cellSize,
+    this.mask,
     this.showDotGrid = false,
     this.animatingArrow,
     this.animationProgress = 0.0,
@@ -46,13 +47,20 @@ class BoardPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. Draw faint dot grid if enabled
+    final isDark = theme.type == GameThemeType.dark;
+
+    // 1. Draw subtle silhouette shape backdrop so the puzzle silhouette is recognizable
+    if (mask != null) {
+      _drawSilhouetteBackdrop(canvas, isDark);
+    }
+
+    // 2. Draw faint dot grid if enabled
     if (showDotGrid) {
       _drawDotGrid(canvas, size);
     }
 
     // Line stroke width scaled to cell size
-    final strokeWidth = (cellSize * 0.18).clamp(2.5, 6.5);
+    final strokeWidth = (cellSize * 0.17).clamp(2.5, 6.0);
 
     final linePaint = Paint()
       ..style = PaintingStyle.stroke
@@ -65,7 +73,7 @@ class BoardPainter extends CustomPainter {
       ..style = PaintingStyle.fill
       ..isAntiAlias = true;
 
-    // 2. Render all static arrows
+    // 3. Render all static arrows
     for (final arrow in board.arrows) {
       if (animatingArrow != null && arrow.id == animatingArrow!.id) {
         // Handled in animating layer
@@ -78,20 +86,22 @@ class BoardPainter extends CustomPainter {
       final isHinted = arrow.id == hintedArrowId;
       final isGuidance = guidanceArrowIds.contains(arrow.id);
 
-      Color color = theme.lineColor;
+      Color color;
       double currentStrokeWidth = strokeWidth;
 
       if (isBlocker) {
         color = theme.errorFlashColor;
         currentStrokeWidth = strokeWidth * 1.25;
       } else if (isHinted) {
-        // Pulsing hint highlight
         final pulse = 0.7 + 0.3 * math.sin(hintPulseProgress * math.pi * 2);
         color = Color.lerp(theme.lineColor, theme.hintColor, pulse)!;
         currentStrokeWidth = strokeWidth * 1.35;
       } else if (isGuidance) {
         color = theme.guidanceColor;
         currentStrokeWidth = strokeWidth * 1.2;
+      } else {
+        // Use harmonic arrow color variant for visual clarity between snakes
+        color = AppColors.getArrowColor(arrow.colorVariant, isDark);
       }
 
       linePaint.color = color;
@@ -106,8 +116,8 @@ class BoardPainter extends CustomPainter {
         canvas.translate(shakeOffset, 0);
       }
 
-      // Draw arrow polyline body
-      final path = _getOrCreatePath(arrow);
+      // Draw arrow polyline body on the fly (no stale cross-level cache pollution)
+      final path = _buildArrowPath(arrow);
       canvas.drawPath(path, linePaint);
 
       // Draw arrowhead at head cell
@@ -121,14 +131,49 @@ class BoardPainter extends CustomPainter {
       canvas.restore();
     }
 
-    // 3. Render the animating escaping arrow (slides along body trail & off board)
+    // 4. Render the animating escaping arrow (slides along body trail & off board)
     if (animatingArrow != null) {
       _drawSlidingArrow(
         canvas: canvas,
         arrow: animatingArrow!,
         progress: animationProgress,
         baseStrokeWidth: strokeWidth,
+        isDark: isDark,
       );
+    }
+  }
+
+  /// Draws a soft, calm silhouette backdrop track behind the active cells.
+  void _drawSilhouetteBackdrop(Canvas canvas, bool isDark) {
+    final backdropPaint = Paint()
+      ..color = (isDark ? const Color(0xFF64B5F6) : const Color(0xFF334155))
+          .withValues(alpha: isDark ? 0.05 : 0.035)
+      ..style = PaintingStyle.fill;
+
+    final borderPaint = Paint()
+      ..color = (isDark ? const Color(0xFF64B5F6) : const Color(0xFF334155))
+          .withValues(alpha: isDark ? 0.09 : 0.06)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    final radius = Radius.circular((cellSize * 0.28).clamp(3.0, 7.0));
+
+    for (int r = 0; r < board.rows; r++) {
+      for (int c = 0; c < board.cols; c++) {
+        if (mask!.isSet(c, r)) {
+          final rect = RRect.fromRectAndRadius(
+            Rect.fromLTWH(
+              c * cellSize + 2.0,
+              r * cellSize + 2.0,
+              cellSize - 4.0,
+              cellSize - 4.0,
+            ),
+            radius,
+          );
+          canvas.drawRRect(rect, backdropPaint);
+          canvas.drawRRect(rect, borderPaint);
+        }
+      }
     }
   }
 
@@ -151,42 +196,35 @@ class BoardPainter extends CustomPainter {
     }
   }
 
-  /// Constructs or retrieves a cached Path for an [Arrow].
-  Path _getOrCreatePath(Arrow arrow) {
-    final cacheKey = '${arrow.id}_${arrow.length}_$cellSize';
-    final cached = _pathCache[cacheKey];
-    if (cached != null) return cached;
-
+  /// Builds a clean vector Path for an [Arrow] directly without static cache corruption.
+  Path _buildArrowPath(Arrow arrow) {
     final path = Path();
     if (arrow.cells.isEmpty) return path;
 
     if (arrow.cells.length == 1) {
-      // 1-cell stub: short segment pointing along headDirection
       final cell = arrow.cells.first;
       final center = Offset((cell.col + 0.5) * cellSize, (cell.row + 0.5) * cellSize);
       final dirVec = _getDirectionVector(arrow.headDirection);
-      final start = center - dirVec * (cellSize * 0.25);
-      final end = center + dirVec * (cellSize * 0.15);
+      final start = center - dirVec * (cellSize * 0.30);
+      final end = center + dirVec * (cellSize * 0.10);
       path.moveTo(start.dx, start.dy);
       path.lineTo(end.dx, end.dy);
-    } else {
-      // Multi-cell snake polyline
-      final startCell = arrow.cells.first;
-      path.moveTo(
-        (startCell.col + 0.5) * cellSize,
-        (startCell.row + 0.5) * cellSize,
-      );
-
-      for (int i = 1; i < arrow.cells.length; i++) {
-        final cell = arrow.cells[i];
-        path.lineTo(
-          (cell.col + 0.5) * cellSize,
-          (cell.row + 0.5) * cellSize,
-        );
-      }
+      return path;
     }
 
-    _pathCache[cacheKey] = path;
+    final startCell = arrow.cells.first;
+    path.moveTo(
+      (startCell.col + 0.5) * cellSize,
+      (startCell.row + 0.5) * cellSize,
+    );
+
+    for (int i = 1; i < arrow.cells.length; i++) {
+      final cell = arrow.cells[i];
+      path.lineTo(
+        (cell.col + 0.5) * cellSize,
+        (cell.row + 0.5) * cellSize,
+      );
+    }
     return path;
   }
 
@@ -206,19 +244,20 @@ class BoardPainter extends CustomPainter {
     final dirVec = _getDirectionVector(arrow.headDirection);
     final perpVec = Offset(-dirVec.dy, dirVec.dx);
 
-    final headLen = (cellSize * 0.38).clamp(8.0, 24.0);
-    final headHalfWidth = (cellSize * 0.26).clamp(5.0, 16.0);
+    final headLen = (cellSize * 0.42).clamp(10.0, 24.0);
+    final headHalfWidth = (cellSize * 0.28).clamp(6.0, 16.0);
 
-    // Tip extends slightly beyond cell center in pointing direction
-    final tip = headCenter + dirVec * (headLen * 0.45);
+    // Tip extends forward in pointing direction
+    final tip = headCenter + dirVec * (headLen * 0.50);
     final baseCenter = tip - dirVec * headLen;
     final leftBarb = baseCenter + perpVec * headHalfWidth;
     final rightBarb = baseCenter - perpVec * headHalfWidth;
+    final notch = baseCenter + dirVec * (headLen * 0.22);
 
     final headPath = Path()
       ..moveTo(tip.dx, tip.dy)
       ..lineTo(leftBarb.dx, leftBarb.dy)
-      ..lineTo(baseCenter.dx + dirVec.dx * (headLen * 0.2), baseCenter.dy + dirVec.dy * (headLen * 0.2))
+      ..lineTo(notch.dx, notch.dy)
       ..lineTo(rightBarb.dx, rightBarb.dy)
       ..close();
 
@@ -231,8 +270,8 @@ class BoardPainter extends CustomPainter {
     required Arrow arrow,
     required double progress,
     required double baseStrokeWidth,
+    required bool isDark,
   }) {
-    // 1. Build the full continuous trajectory (body path + extended escape ray off-board)
     final trajectoryPath = Path();
     if (arrow.cells.isEmpty) return;
 
@@ -260,17 +299,14 @@ class BoardPainter extends CustomPainter {
     );
     trajectoryPath.lineTo(farTarget.dx, farTarget.dy);
 
-    // Measure metrics
     final metrics = trajectoryPath.computeMetrics().toList();
     if (metrics.isEmpty) return;
     final metric = metrics.first;
 
-    // Body length of the arrow
     final bodyLength = arrow.cells.length == 1
         ? cellSize * 0.4
         : (arrow.cells.length - 1) * cellSize;
 
-    // Total distance the head slides during animation
     final totalSlide = boardSpan * 0.8;
     final currentHeadDist = bodyLength + progress * totalSlide;
     final currentTailDist = math.max(0.0, currentHeadDist - bodyLength);
@@ -279,9 +315,9 @@ class BoardPainter extends CustomPainter {
 
     final subPath = metric.extractPath(currentTailDist, currentHeadDist.clamp(0.0, metric.length));
 
-    // Smooth fade as it exits
+    final baseColor = AppColors.getArrowColor(arrow.colorVariant, isDark);
     final alpha = ((1.0 - progress * 0.7)).clamp(0.0, 1.0);
-    final slideColor = theme.lineColor.withValues(alpha: alpha);
+    final slideColor = baseColor.withValues(alpha: alpha);
 
     final linePaint = Paint()
       ..color = slideColor
@@ -301,18 +337,19 @@ class BoardPainter extends CustomPainter {
       final headDirVec = Offset(tangentVec.dx, tangentVec.dy);
       final perpVec = Offset(-headDirVec.dy, headDirVec.dx);
 
-      final headLen = (cellSize * 0.38).clamp(8.0, 24.0);
-      final headHalfWidth = (cellSize * 0.26).clamp(5.0, 16.0);
+      final headLen = (cellSize * 0.42).clamp(10.0, 24.0);
+      final headHalfWidth = (cellSize * 0.28).clamp(6.0, 16.0);
 
-      final tip = headCenter + headDirVec * (headLen * 0.45);
+      final tip = headCenter + headDirVec * (headLen * 0.50);
       final baseCenter = tip - headDirVec * headLen;
       final leftBarb = baseCenter + perpVec * headHalfWidth;
       final rightBarb = baseCenter - perpVec * headHalfWidth;
+      final notch = baseCenter + headDirVec * (headLen * 0.22);
 
       final headPath = Path()
         ..moveTo(tip.dx, tip.dy)
         ..lineTo(leftBarb.dx, leftBarb.dy)
-        ..lineTo(baseCenter.dx + headDirVec.dx * (headLen * 0.2), baseCenter.dy + headDirVec.dy * (headLen * 0.2))
+        ..lineTo(notch.dx, notch.dy)
         ..lineTo(rightBarb.dx, rightBarb.dy)
         ..close();
 
@@ -343,6 +380,7 @@ class BoardPainter extends CustomPainter {
     return oldDelegate.board != board ||
         oldDelegate.theme != theme ||
         oldDelegate.cellSize != cellSize ||
+        oldDelegate.mask != mask ||
         oldDelegate.showDotGrid != showDotGrid ||
         oldDelegate.animatingArrow != animatingArrow ||
         oldDelegate.animationProgress != animationProgress ||

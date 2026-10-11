@@ -55,3 +55,6 @@ app.*.map.json
 # Kotlin compiler daemon
 .kotlin/
 **/android/.kotlin/
+
+# Output packages
+*.apk

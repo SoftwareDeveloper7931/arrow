@@ -65,4 +65,54 @@ void main() {
     expect(file.existsSync(), isTrue);
     expect(file.lengthSync(), greaterThan(1000));
   });
+
+  testWidgets('Capture Level 2 Anchor silhouette screenshot', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 2.625;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({
+      'arrow_flow_current_level': 2,
+      'arrow_flow_unlocked_level': 2,
+      'arrow_flow_hints': 3,
+      'arrow_flow_theme': 'dark',
+    });
+
+    final storage = await StorageService.init();
+    final boundaryKey = GlobalKey();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          storageServiceProvider.overrideWithValue(storage),
+          audioServiceProvider.overrideWithValue(AudioService(isTestMode: true)),
+        ],
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: RepaintBoundary(
+            key: boundaryKey,
+            child: const GameScreen(),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    await tester.runAsync(() async {
+      final boundary = boundaryKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      final ui.Image image = await boundary.toImage(pixelRatio: 2.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      final bytes = byteData!.buffer.asUint8List();
+
+      final file = File('d:/work/game/arrow/anchor_level_2.png');
+      await file.writeAsBytes(bytes);
+    });
+
+    final file = File('d:/work/game/arrow/anchor_level_2.png');
+    expect(file.existsSync(), isTrue);
+    expect(file.lengthSync(), greaterThan(1000));
+  });
 }

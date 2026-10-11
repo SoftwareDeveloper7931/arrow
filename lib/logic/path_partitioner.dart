@@ -76,7 +76,7 @@ class PathPartitioner {
       paths.add(currentPath);
     }
 
-    // Post-processing: try to merge any tiny 1-cell paths into neighboring path endpoints
+    // Post-processing: eliminate any 1-cell paths
     final mergedPaths = <List<Cell>>[];
     final smallPaths = <List<Cell>>[];
 
@@ -88,11 +88,13 @@ class PathPartitioner {
       }
     }
 
+    final unmerged = <List<Cell>>[];
+
     for (final small in smallPaths) {
       final cell = small.first;
       bool merged = false;
 
-      // Try to attach to an endpoint of an existing path
+      // 1. Try to attach to an endpoint of an existing path
       for (final p in mergedPaths) {
         if (_areAdjacent(cell, p.first)) {
           p.insert(0, cell);
@@ -106,7 +108,58 @@ class PathPartitioner {
       }
 
       if (!merged) {
-        // If cannot merge to an endpoint, keep as is
+        unmerged.add(small);
+      }
+    }
+
+    // 2. Try to pair adjacent 1-cell paths together into a 2-cell path
+    final remainingUnmerged = <List<Cell>>[];
+    final pairedIndices = <int>{};
+
+    for (int i = 0; i < unmerged.length; i++) {
+      if (pairedIndices.contains(i)) continue;
+      bool paired = false;
+      for (int j = i + 1; j < unmerged.length; j++) {
+        if (pairedIndices.contains(j)) continue;
+        if (_areAdjacent(unmerged[i].first, unmerged[j].first)) {
+          mergedPaths.add([unmerged[i].first, unmerged[j].first]);
+          pairedIndices.add(i);
+          pairedIndices.add(j);
+          paired = true;
+          break;
+        }
+      }
+      if (!paired) {
+        remainingUnmerged.add(unmerged[i]);
+      }
+    }
+
+    // 3. Try to split a longer path (length >= 4) that is adjacent to the small cell
+    for (final small in remainingUnmerged) {
+      final cell = small.first;
+      bool merged = false;
+
+      for (int pIdx = 0; pIdx < mergedPaths.length; pIdx++) {
+        final p = mergedPaths[pIdx];
+        if (p.length >= 4) {
+          for (int i = 1; i < p.length - 1; i++) {
+            if (_areAdjacent(cell, p[i])) {
+              // Split p at index i: [p[0]..p[i], cell] and [p[i+1]..p[last]]
+              final p1 = [...p.sublist(0, i + 1), cell];
+              final p2 = p.sublist(i + 1);
+              if (p1.length >= 2 && p2.length >= 2) {
+                mergedPaths[pIdx] = p1;
+                mergedPaths.add(p2);
+                merged = true;
+                break;
+              }
+            }
+          }
+          if (merged) break;
+        }
+      }
+
+      if (!merged) {
         mergedPaths.add(small);
       }
     }

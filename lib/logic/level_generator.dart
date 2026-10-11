@@ -62,6 +62,7 @@ class LevelGenerator {
       );
 
       if (rawPaths.isEmpty) continue;
+      if (attempt < 15 && rawPaths.any((p) => p.length < 2)) continue;
 
       // Assign heads and directions to paths
       var arrows = _assignHeadsAndDirections(

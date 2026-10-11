@@ -196,6 +196,7 @@ class _BoardWidgetState extends ConsumerState<BoardWidget>
                         board: board,
                         theme: theme,
                         cellSize: cellSize,
+                        mask: gameState.level.mask,
                         showDotGrid: gameState.showDotGrid,
                         animatingArrow: gameState.animatingArrow,
                         animationProgress: _slideController.value,
