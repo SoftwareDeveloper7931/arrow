@@ -122,22 +122,36 @@ The game includes a production-ready `AdsService` abstraction (`lib/services/ads
 
 ## 🚀 Running & Building
 
-### Run All Unit and Integration Tests
+### ⚡ One-Click Local Run (Recommended)
+You can launch the game locally in a standalone portrait mobile window (430x932) with a single click:
+- **Windows Batch**: Double-click `run_local.bat` or run:
+  ```cmd
+  run_local.bat
+  ```
+- **PowerShell**:
+  ```powershell
+  .\run_local.ps1
+  ```
+  *(Or with mode parameters: `.\run_local.ps1 -Mode debug` for hot-reload, `.\run_local.ps1 -Mode test` for unit tests)*
+
+### 🛠️ Flutter Development (Live Hot-Reload)
+Run Flutter directly against Chrome:
+```bash
+flutter run -d chrome
+```
+
+### 🧪 Run All Unit and Integration Tests
 ```bash
 flutter test
 ```
 
-### Static Analysis
+### 🔍 Static Analysis
 ```bash
 flutter analyze
 ```
 
-### Run Locally (Android / Chrome / Desktop)
-```bash
-flutter run
-```
-
-### Build Production Android APK
+### 📱 Build Production Android APK
 ```bash
 flutter build apk --release
 ```
+
