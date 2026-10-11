@@ -10,8 +10,8 @@ cd /d "%~dp0"
 
 REM Step 1: Ensure Web build exists
 if not exist "build\web\index.html" (
-    echo [1/3] Building Web release...
-    call flutter build web
+    echo [1/3] Building Web release with offline resources...
+    call flutter build web --no-web-resources-cdn
     if errorlevel 1 (
         echo [ERROR] Flutter web build failed.
         pause
@@ -24,8 +24,8 @@ if not exist "build\web\index.html" (
 REM Step 2: Check if port 8080 is already active
 netstat -ano | findstr ":8080" | findstr "LISTENING" >nul 2>&1
 if errorlevel 1 (
-    echo [2/3] Starting local HTTP server on http://localhost:8080/ ...
-    start /B python -m http.server 8080 --directory build\web >nul 2>&1
+    echo [2/3] Starting multi-threaded local HTTP server on http://localhost:8080/ ...
+    start /B python tool\serve.py 8080 >nul 2>&1
     timeout /t 2 /nobreak >nul
 ) else (
     echo [2/3] Server already running on http://localhost:8080/.

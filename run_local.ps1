@@ -26,8 +26,8 @@ Write-Host ""
 function Start-AppMode {
     Write-Host "[1/3] Checking web build..." -ForegroundColor Yellow
     if (-not (Test-Path "build\web\index.html")) {
-        Write-Host "Building web release bundle..." -ForegroundColor Gray
-        flutter build web
+        Write-Host "Building web release bundle with offline resources..." -ForegroundColor Gray
+        flutter build web --no-web-resources-cdn
     } else {
         Write-Host "Web bundle ready in build\web" -ForegroundColor Green
     }
@@ -44,8 +44,8 @@ function Start-AppMode {
     }
 
     if (-not $portActive) {
-        Write-Host "Starting background web server..." -ForegroundColor Gray
-        Start-Process python -ArgumentList "-m http.server 8080 --directory build/web" -WindowStyle Hidden
+        Write-Host "Starting multi-threaded web server..." -ForegroundColor Gray
+        Start-Process python -ArgumentList "tool\serve.py 8080" -WindowStyle Hidden
         Start-Sleep -Seconds 2
     } else {
         Write-Host "Server already responding on port 8080" -ForegroundColor Green
@@ -102,8 +102,8 @@ function Start-DebugMode {
 }
 
 function Invoke-Rebuild {
-    Write-Host "Rebuilding production web application..." -ForegroundColor Cyan
-    flutter build web
+    Write-Host "Rebuilding production web application with offline resources..." -ForegroundColor Cyan
+    flutter build web --no-web-resources-cdn
     Write-Host "Web build completed successfully!" -ForegroundColor Green
 }
 
