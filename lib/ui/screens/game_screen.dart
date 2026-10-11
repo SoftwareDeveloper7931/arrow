@@ -4,12 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../logic/game_constants.dart';
 import '../../state/game_state.dart';
 import '../../state/providers.dart';
-import '../../theme/app_colors.dart';
+import '../../theme/game_theme.dart';
 import '../dialogs/fail_dialog.dart';
 import '../dialogs/hint_reward_dialog.dart';
 import '../dialogs/win_dialog.dart';
 import '../widgets/board_widget.dart';
-import '../widgets/hearts_widget.dart';
+import '../widgets/water_drops_widget.dart';
+import 'settings_screen.dart';
 
 class GameScreen extends ConsumerStatefulWidget {
   const GameScreen({super.key});
@@ -36,13 +37,13 @@ class _GameScreenState extends ConsumerState<GameScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Graceful handling of backgrounding mid-level
     if (state == AppLifecycleState.paused) {
       ref.read(gameControllerProvider.notifier).hideGuidance();
     }
   }
 
-  void _listenForStatusChanges(BuildContext context, GameState? prev, GameState next) {
+  void _listenForStatusChanges(
+      BuildContext context, GameState? prev, GameState next) {
     if (_dialogOpen) return;
 
     if (next.status == GameStatus.won && prev?.status != GameStatus.won) {
@@ -55,8 +56,9 @@ class _GameScreenState extends ConsumerState<GameScreen>
             context: context,
             barrierDismissible: false,
             builder: (_) => WinDialog(
-              levelNumber: next.level.number,
+              level: next.level,
               stars: next.starsEarned,
+              theme: next.currentTheme,
               onNextLevel: () {
                 _dialogOpen = false;
                 Navigator.of(context).pop();
@@ -71,13 +73,15 @@ class _GameScreenState extends ConsumerState<GameScreen>
           );
         },
       );
-    } else if (next.status == GameStatus.failed && prev?.status != GameStatus.failed) {
+    } else if (next.status == GameStatus.failed &&
+        prev?.status != GameStatus.failed) {
       _dialogOpen = true;
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (_) => FailDialog(
           levelNumber: next.level.number,
+          theme: next.currentTheme,
           onRetry: () {
             _dialogOpen = false;
             Navigator.of(context).pop();
@@ -90,13 +94,116 @@ class _GameScreenState extends ConsumerState<GameScreen>
                 .read(gameControllerProvider.notifier)
                 .watchAdToContinue();
             if (!revived && mounted) {
-              // Fallback to restart if ad was cancelled
               ref.read(gameControllerProvider.notifier).restartLevel();
             }
           },
         ),
       );
     }
+  }
+
+  void _showThemePicker(BuildContext context, GameTheme currentTheme) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: currentTheme.backgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Choose Theme',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: currentTheme.textPrimaryColor,
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close_rounded,
+                          color: currentTheme.textSecondaryColor),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: GameThemeType.values.map((type) {
+                    final theme = GameTheme.getByType(type);
+                    final isSelected = theme.type == currentTheme.type;
+
+                    return InkWell(
+                      onTap: () {
+                        ref
+                            .read(gameControllerProvider.notifier)
+                            .setTheme(type);
+                        Navigator.of(context).pop();
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        width: 150,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: theme.cardColor,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isSelected
+                                ? theme.lineColor
+                                : theme.lineColor.withValues(alpha: 0.2),
+                            width: isSelected ? 2.5 : 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: theme.backgroundColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: theme.lineColor,
+                                  width: 2.5,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                theme.name,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.w500,
+                                  color: theme.textPrimaryColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -107,159 +214,237 @@ class _GameScreenState extends ConsumerState<GameScreen>
     );
 
     final gameState = ref.watch(gameControllerProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = gameState.currentTheme;
 
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Column(
-          children: [
-            Text(
-              'Level ${gameState.level.number}',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-            Text(
-              '${gameState.level.size}x${gameState.level.size} Grid',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightTextSecondary,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Restart Level',
-            icon: const Icon(Icons.refresh_rounded, size: 22),
-            onPressed: () {
-              ref.read(gameControllerProvider.notifier).restartLevel();
-            },
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
+      backgroundColor: theme.backgroundColor,
       body: SafeArea(
         child: Column(
           children: [
-            // Status bar (Hearts, Hint Button)
+            // Top Bar: Back, "Level N", Theme palette icon, Settings icon
             Padding(
               padding:
-                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  HeartsWidget(remainingHearts: gameState.hearts),
-
-                  // Hint Button with badge counter
-                  InkWell(
-                    onTap: () {
-                      final hasHints = ref
-                          .read(gameControllerProvider.notifier)
-                          .requestHint();
-                      if (!hasHints) {
-                        showDialog(
-                          context: context,
-                          builder: (_) => HintRewardDialog(
-                            onWatchAd: () {
-                              ref
-                                  .read(gameControllerProvider.notifier)
-                                  .watchAdForHints();
-                            },
-                          ),
-                        );
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF222631)
-                            : const Color(0xFFEDF2F7),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: gameState.hintedArrowId != null
-                              ? AppColors.hintGold
-                              : Colors.transparent,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.lightbulb_rounded,
-                            size: 18,
-                            color: gameState.availableHints > 0
-                                ? AppColors.hintGold
-                                : (isDark ? Colors.white30 : Colors.black26),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${gameState.availableHints}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: isDark
-                                  ? AppColors.darkTextPrimary
-                                  : AppColors.lightTextPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: theme.textPrimaryColor,
+                      size: 22,
                     ),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Level ${gameState.level.number}',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.3,
+                            color: theme.textPrimaryColor,
+                          ),
+                        ),
+                        Text(
+                          gameState.level.shapeName,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: theme.textSecondaryColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Theme Palette',
+                    icon: Icon(
+                      Icons.palette_outlined,
+                      color: theme.textPrimaryColor,
+                      size: 24,
+                    ),
+                    onPressed: () => _showThemePicker(context, theme),
+                  ),
+                  IconButton(
+                    tooltip: 'Settings',
+                    icon: Icon(
+                      Icons.settings_outlined,
+                      color: theme.textPrimaryColor,
+                      size: 24,
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const SettingsScreen(),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 12),
+            // Water-drop lives indicator (3 blue drops)
+            Padding(
+              padding: const EdgeInsets.only(top: 2.0, bottom: 8.0),
+              child: WaterDropsWidget(
+                remainingDrops: gameState.waterDrops,
+                theme: theme,
+              ),
+            ),
 
-            // Centered responsive puzzle board
+            // Centered minimalist silhouette puzzle board
             const Expanded(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                padding: EdgeInsets.symmetric(horizontal: 12.0),
                 child: BoardWidget(),
               ),
             ),
 
-            // Bottom informational banner
+            // Bottom circular control buttons (Grid-toggle and Hint button)
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
-              child: Column(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 32.0, vertical: 18.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '${gameState.board.remainingCount} arrows remaining',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.touch_app_outlined,
-                        size: 14,
-                        color: isDark ? Colors.white38 : Colors.black38,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Hold to reveal clear paths',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark ? Colors.white38 : Colors.black45,
+                  // Circular Grid-Toggle Button
+                  Tooltip(
+                    message: gameState.showDotGrid
+                        ? 'Hide dot grid'
+                        : 'Show dot grid',
+                    child: InkWell(
+                      onTap: () {
+                        ref
+                            .read(gameControllerProvider.notifier)
+                            .toggleDotGrid();
+                      },
+                      borderRadius: BorderRadius.circular(30),
+                      child: Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: gameState.showDotGrid
+                              ? theme.cardColor
+                              : theme.backgroundColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: gameState.showDotGrid
+                                ? theme.lineColor
+                                : theme.lineColor.withValues(alpha: 0.25),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          Icons.grid_3x3_rounded,
+                          color: gameState.showDotGrid
+                              ? theme.lineColor
+                              : theme.textSecondaryColor,
+                          size: 26,
                         ),
                       ),
-                    ],
+                    ),
+                  ),
+
+                  // Circular Hint Button with counter badge
+                  Tooltip(
+                    message: 'Get hint',
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        InkWell(
+                          onTap: () {
+                            final success = ref
+                                .read(gameControllerProvider.notifier)
+                                .requestHint();
+                            if (!success) {
+                              showDialog(
+                                context: context,
+                                builder: (_) => HintRewardDialog(
+                                  theme: theme,
+                                  onWatchAd: () {
+                                    ref
+                                        .read(gameControllerProvider.notifier)
+                                        .watchAdForHints();
+                                  },
+                                ),
+                              );
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(30),
+                          child: Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: gameState.hintedArrowId != null
+                                  ? theme.hintColor.withValues(alpha: 0.15)
+                                  : theme.backgroundColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: gameState.hintedArrowId != null
+                                    ? theme.hintColor
+                                    : theme.lineColor.withValues(alpha: 0.25),
+                                width: 1.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.lightbulb_outline_rounded,
+                              color: gameState.availableHints > 0
+                                  ? theme.hintColor
+                                  : theme.textSecondaryColor,
+                              size: 26,
+                            ),
+                          ),
+                        ),
+                        // Badge counter
+                        Positioned(
+                          right: -4,
+                          top: -4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.hintColor,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.15),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              '${gameState.availableHints}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),

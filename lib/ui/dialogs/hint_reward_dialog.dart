@@ -1,34 +1,41 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
+import '../../theme/game_theme.dart';
 
 class HintRewardDialog extends StatelessWidget {
+  final GameTheme theme;
   final VoidCallback onWatchAd;
 
   const HintRewardDialog({
     super.key,
+    required this.theme,
     required this.onWatchAd,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      backgroundColor: theme.backgroundColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+        side: BorderSide(
+          color: theme.lineColor.withValues(alpha: 0.15),
+          width: 1.5,
+        ),
+      ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 30),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.hintGold.withValues(alpha: 0.15),
+                color: theme.hintColor.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.lightbulb_outline_rounded,
-                color: AppColors.hintGold,
+                color: theme.hintColor,
                 size: 40,
               ),
             ),
@@ -39,9 +46,7 @@ class HintRewardDialog extends StatelessWidget {
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
                 letterSpacing: -0.4,
-                color: isDark
-                    ? AppColors.darkTextPrimary
-                    : AppColors.lightTextPrimary,
+                color: theme.textPrimaryColor,
               ),
             ),
             const SizedBox(height: 8),
@@ -50,12 +55,10 @@ class HintRewardDialog extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightTextSecondary,
+                color: theme.textSecondaryColor,
               ),
             ),
-            const SizedBox(height: 26),
+            const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -67,11 +70,11 @@ class HintRewardDialog extends StatelessWidget {
                 icon: const Icon(Icons.play_circle_outline_rounded, size: 22),
                 label: const Text(
                   'Watch Ad (+2 Hints)',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.hintGold,
-                  foregroundColor: Colors.white,
+                  backgroundColor: theme.lineColor,
+                  foregroundColor: theme.backgroundColor,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -85,9 +88,7 @@ class HintRewardDialog extends StatelessWidget {
               child: Text(
                 'Cancel',
                 style: TextStyle(
-                  color: isDark
-                      ? AppColors.darkTextSecondary
-                      : AppColors.lightTextSecondary,
+                  color: theme.textSecondaryColor,
                   fontSize: 14,
                 ),
               ),

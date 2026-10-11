@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../state/providers.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/game_theme.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -58,12 +59,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
 
           const SizedBox(height: 24),
-          _buildSectionHeader('Appearance', isDark),
+          _buildSectionHeader('Appearance & Theme', isDark),
           _buildSettingsCard(
             isDark: isDark,
             children: [
               ListTile(
-                title: const Text('Theme Mode'),
+                title: const Text('Puzzle Color Palette'),
+                subtitle: Text(
+                  storage.getTheme().name,
+                ),
+                trailing: DropdownButton<GameThemeType>(
+                  value: storage.getTheme(),
+                  underline: const SizedBox(),
+                  dropdownColor: isDark ? AppColors.darkSurface : Colors.white,
+                  items: GameThemeType.values.map((type) {
+                    final theme = GameTheme.getByType(type);
+                    return DropdownMenuItem(
+                      value: type,
+                      child: Text(theme.name),
+                    );
+                  }).toList(),
+                  onChanged: (newTheme) {
+                    if (newTheme != null) {
+                      ref.read(gameControllerProvider.notifier).setTheme(newTheme);
+                      if (mounted) setState(() {});
+                    }
+                  },
+                ),
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+              ListTile(
+                title: const Text('App UI Mode'),
                 subtitle: Text(
                   themeMode == ThemeMode.system
                       ? 'System Default'

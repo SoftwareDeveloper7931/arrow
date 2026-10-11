@@ -5,72 +5,48 @@ import 'package:arrow_flow/models/direction.dart';
 import 'package:arrow_flow/logic/move_validator.dart';
 
 void main() {
-  group('MoveValidator Tests', () {
-    test('Arrow pointing directly at board edge can exit', () {
-      final board = Board.empty(4);
-      // Arrow at (0, 1) pointing UP (immediately exits off row 0)
-      final arrowUp = Arrow.create(row: 0, col: 1, direction: Direction.up);
-      // Arrow at (3, 2) pointing DOWN (immediately exits off row 3)
-      final arrowDown = Arrow.create(row: 3, col: 2, direction: Direction.down);
-      // Arrow at (2, 0) pointing LEFT (immediately exits off col 0)
-      final arrowLeft = Arrow.create(row: 2, col: 0, direction: Direction.left);
-      // Arrow at (1, 3) pointing RIGHT (immediately exits off col 3)
-      final arrowRight = Arrow.create(row: 1, col: 3, direction: Direction.right);
+  group('MoveValidator Tests (Snake Paths)', () {
+    test('Snake arrow pointing directly towards edge can escape', () {
+      // 8x8 board
+      // Arrow from (4, 4) to (4, 6) pointing right
+      final arrowA = Arrow(
+        id: 'a',
+        cells: const [Cell(4, 4), Cell(4, 5), Cell(4, 6)],
+        headDirection: Direction.right,
+      );
 
-      final populatedBoard = board
-          .withArrow(arrowUp)
-          .withArrow(arrowDown)
-          .withArrow(arrowLeft)
-          .withArrow(arrowRight);
+      final board = Board.fromArrows(rows: 8, cols: 8, arrows: [arrowA]);
 
-      expect(MoveValidator.canExit(populatedBoard, arrowUp), isTrue);
-      expect(MoveValidator.canExit(populatedBoard, arrowDown), isTrue);
-      expect(MoveValidator.canExit(populatedBoard, arrowLeft), isTrue);
-      expect(MoveValidator.canExit(populatedBoard, arrowRight), isTrue);
+      expect(MoveValidator.canEscape(board, arrowA), isTrue);
+      expect(MoveValidator.findBlockingArrow(board, arrowA), isNull);
     });
 
-    test('Arrow blocked by another arrow cannot exit and identifies blocker', () {
-      final board = Board.empty(4);
-      final arrowA = Arrow.create(row: 2, col: 0, direction: Direction.right);
-      final arrowB = Arrow.create(row: 2, col: 2, direction: Direction.up);
+    test('Snake arrow blocked by another snake arrow is correctly detected', () {
+      // 8x8 board
+      // Arrow A from (4, 2) to (4, 4) pointing right
+      final arrowA = Arrow(
+        id: 'a',
+        cells: const [Cell(4, 2), Cell(4, 3), Cell(4, 4)],
+        headDirection: Direction.right,
+      );
 
-      final populatedBoard = board.withArrow(arrowA).withArrow(arrowB);
+      // Arrow B from (2, 6) to (5, 6) pointing down (lies in (4, 6) which is along A's ray!)
+      final arrowB = Arrow(
+        id: 'b',
+        cells: const [Cell(2, 6), Cell(3, 6), Cell(4, 6), Cell(5, 6)],
+        headDirection: Direction.down,
+      );
 
-      // arrowA points right: (2, 1) is empty, but (2, 2) has arrowB!
-      expect(MoveValidator.canExit(populatedBoard, arrowA), isFalse);
-      final blocker = MoveValidator.findBlockingArrow(populatedBoard, arrowA);
+      final board = Board.fromArrows(rows: 8, cols: 8, arrows: [arrowA, arrowB]);
+
+      // Arrow A points right: at (4, 6) it hits Arrow B!
+      expect(MoveValidator.canEscape(board, arrowA), isFalse);
+      final blocker = MoveValidator.findBlockingArrow(board, arrowA);
       expect(blocker, isNotNull);
-      expect(blocker!.id, equals(arrowB.id));
+      expect(blocker!.id, equals('b'));
 
-      // arrowB points up: (1, 2) and (0, 2) are empty. It can exit!
-      expect(MoveValidator.canExit(populatedBoard, arrowB), isTrue);
-      expect(MoveValidator.findBlockingArrow(populatedBoard, arrowB), isNull);
-    });
-
-    test('validateMove computes full exit path', () {
-      final board = Board.empty(4);
-      final arrow = Arrow.create(row: 0, col: 1, direction: Direction.down);
-      final populatedBoard = board.withArrow(arrow);
-
-      final res = MoveValidator.validateMove(populatedBoard, arrow);
-      expect(res.canExit, isTrue);
-      // Traversed cells: (1, 1), (2, 1), (3, 1)
-      expect(res.exitPath.length, equals(3));
-      expect(res.exitPath[0], equals((1, 1)));
-      expect(res.exitPath[1], equals((2, 1)));
-      expect(res.exitPath[2], equals((3, 1)));
-    });
-
-    test('findExitClearArrows returns only free arrows', () {
-      final board = Board.empty(4);
-      final arrow1 = Arrow.create(row: 1, col: 1, direction: Direction.left); // exits via col 0
-      final arrow2 = Arrow.create(row: 1, col: 2, direction: Direction.left); // blocked by arrow1
-
-      final populatedBoard = board.withArrow(arrow1).withArrow(arrow2);
-
-      final clear = MoveValidator.findExitClearArrows(populatedBoard);
-      expect(clear.length, equals(1));
-      expect(clear.first.id, equals(arrow1.id));
+      // Arrow B points down: head is at (5, 6), row 6 and 7 are empty. Arrow B can escape!
+      expect(MoveValidator.canEscape(board, arrowB), isTrue);
     });
   });
 }

@@ -10,6 +10,7 @@ import '../models/level.dart';
 import '../services/ads_service.dart';
 import '../services/audio_service.dart';
 import '../services/storage_service.dart';
+import '../theme/game_theme.dart';
 import 'game_state.dart';
 
 class GameController extends StateNotifier<GameState> {
@@ -27,18 +28,24 @@ class GameController extends StateNotifier<GameState> {
   }) : super(_createInitialState(
           levelNumber: initialLevelNumber ?? storageService.getCurrentLevel(),
           hints: storageService.getHintCount(),
+          theme: GameTheme.getByType(storageService.getTheme()),
+          showDotGrid: storageService.getShowDotGrid(),
         ));
 
   static GameState _createInitialState({
     required int levelNumber,
     required int hints,
+    required GameTheme theme,
+    required bool showDotGrid,
   }) {
     final level = LevelGenerator.generateLevel(levelNumber);
     return GameState(
       level: level,
       board: level.createInitialBoard(),
-      hearts: GameConstants.initialHearts,
+      waterDrops: GameConstants.initialHearts,
       availableHints: hints,
+      currentTheme: theme,
+      showDotGrid: showDotGrid,
       status: GameStatus.playing,
     );
   }
@@ -52,20 +59,24 @@ class GameController extends StateNotifier<GameState> {
     state = GameState(
       level: level,
       board: level.createInitialBoard(),
-      hearts: GameConstants.initialHearts,
+      waterDrops: GameConstants.initialHearts,
       availableHints: storageService.getHintCount(),
+      currentTheme: state.currentTheme,
+      showDotGrid: state.showDotGrid,
       status: GameStatus.playing,
     );
   }
 
-  /// Restarts the current active level with fresh hearts.
+  /// Restarts the current active level with fresh water drops.
   void restartLevel() {
     _hintDismissTimer?.cancel();
     state = GameState(
       level: state.level,
       board: state.level.createInitialBoard(),
-      hearts: GameConstants.initialHearts,
+      waterDrops: GameConstants.initialHearts,
       availableHints: storageService.getHintCount(),
+      currentTheme: state.currentTheme,
+      showDotGrid: state.showDotGrid,
       status: GameStatus.playing,
     );
   }
@@ -76,9 +87,31 @@ class GameController extends StateNotifier<GameState> {
     loadLevel(nextLvl);
   }
 
-  /// Called when an arrow tile is tapped by the player.
+  /// Toggles faint dot grid visibility under the board.
+  void toggleDotGrid() {
+    final nextVal = !state.showDotGrid;
+    storageService.setShowDotGrid(nextVal);
+    state = state.copyWith(showDotGrid: nextVal);
+  }
+
+  /// Cycles to the next color theme (Eye Comfort -> Dark -> Paper -> Sepia -> Eye Comfort).
+  void cycleTheme() {
+    final values = GameThemeType.values;
+    final nextIndex = (state.currentTheme.type.index + 1) % values.length;
+    final nextThemeType = values[nextIndex];
+    setTheme(nextThemeType);
+  }
+
+  /// Sets the active game theme.
+  void setTheme(GameThemeType themeType) {
+    storageService.setTheme(themeType);
+    final theme = GameTheme.getByType(themeType);
+    state = state.copyWith(currentTheme: theme);
+  }
+
+  /// Called when an arrow is tapped by the player.
   Future<void> onArrowTapped(Arrow arrow) async {
-    // Edge case: Ignore input if currently animating, won, or failed.
+    // Ignore input if currently animating, won, or failed.
     if (state.isInteractionBlocked) return;
 
     // Clear active hints if player acts
@@ -86,14 +119,14 @@ class GameController extends StateNotifier<GameState> {
 
     final validation = MoveValidator.validateMove(state.board, arrow);
 
-    if (validation.canExit) {
+    if (validation.canEscape) {
       // SUCCESS: Arrow has an unblocked path to the edge
       audioService.playWhoosh();
       audioService.hapticSuccess();
 
       state = state.copyWith(
         status: GameStatus.animating,
-        animatingArrowId: arrow.id,
+        animatingArrow: arrow,
         clearHintedArrow: true,
         guidanceArrowIds: {},
       );
@@ -108,7 +141,7 @@ class GameController extends StateNotifier<GameState> {
       final isCleared = updatedBoard.isCleared;
 
       if (isCleared) {
-        final stars = Level.calculateStars(state.hearts);
+        final stars = Level.calculateStars(state.waterDrops);
         audioService.playWin();
 
         // Save progress
@@ -122,7 +155,7 @@ class GameController extends StateNotifier<GameState> {
           starsEarned: stars,
         );
 
-        // Check if an interstitial ad should be shown (e.g. every 3 completed levels)
+        // Check if an interstitial ad should be shown (every 3 completed levels, min level 5)
         await adsService.showInterstitial(
           completedLevelNumber: state.level.number,
         );
@@ -138,12 +171,12 @@ class GameController extends StateNotifier<GameState> {
       audioService.playError();
       audioService.hapticError();
 
-      final newHearts = state.hearts - 1;
+      final newDrops = state.waterDrops - 1;
       final blocker = validation.blockingArrow;
 
       state = state.copyWith(
         status: GameStatus.animating,
-        hearts: newHearts,
+        waterDrops: newDrops,
         shakingArrowId: arrow.id,
         blockingArrowId: blocker?.id,
         clearHintedArrow: true,
@@ -155,7 +188,7 @@ class GameController extends StateNotifier<GameState> {
         const Duration(milliseconds: GameConstants.shakeDurationMs),
       );
 
-      if (newHearts <= 0) {
+      if (newDrops <= 0) {
         state = state.copyWith(
           status: GameStatus.failed,
           clearShakingArrow: true,
@@ -176,7 +209,7 @@ class GameController extends StateNotifier<GameState> {
     if (state.isInteractionBlocked) return;
     audioService.hapticSelection();
 
-    final unblocked = MoveValidator.findExitClearArrows(state.board);
+    final unblocked = MoveValidator.findEscapableArrows(state.board);
     final unblockedIds = unblocked.map((a) => a.id).toSet();
 
     state = state.copyWith(guidanceArrowIds: unblockedIds);
@@ -241,7 +274,7 @@ class GameController extends StateNotifier<GameState> {
     final success = await adsService.showRewarded(placement: 'revive_level');
     if (success) {
       state = state.copyWith(
-        hearts: GameConstants.rewardedAdHeartsReward,
+        waterDrops: GameConstants.rewardedAdHeartsReward,
         status: GameStatus.playing,
       );
       audioService.playWin();

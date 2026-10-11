@@ -1,61 +1,43 @@
 import 'arrow.dart';
 import 'board.dart';
+import 'shape_mask.dart';
 
-/// Represents a puzzle level configuration.
+/// Represents a silhouette puzzle level configuration.
 class Level {
   final int number;
-  final int size;
+  final String shapeName;
+  final int rows;
+  final int cols;
   final List<Arrow> initialArrows;
-  final List<String> guaranteedSolutionOrder;
+  final ShapeMask? mask;
 
   const Level({
     required this.number,
-    required this.size,
+    required this.shapeName,
+    required this.rows,
+    required this.cols,
     required this.initialArrows,
-    this.guaranteedSolutionOrder = const [],
+    this.mask,
   });
 
   /// Instantiates a fresh initial [Board] for this level.
   Board createInitialBoard() {
-    return Board.fromArrows(size, initialArrows);
-  }
-
-  /// Calculates stars awarded based on remaining hearts (3 max).
-  /// 3 hearts left (0 errors) -> 3 stars
-  /// 2 hearts left (1 error)  -> 2 stars
-  /// 1 heart left (2 errors)  -> 1 star
-  /// 0 hearts -> 0 stars
-  static int calculateStars(int remainingHearts) {
-    if (remainingHearts >= 3) return 3;
-    if (remainingHearts == 2) return 2;
-    if (remainingHearts == 1) return 1;
-    return 0;
-  }
-
-  Map<String, dynamic> toJson() => {
-        'number': number,
-        'size': size,
-        'arrows': initialArrows.map((a) => a.toJson()).toList(),
-        'solutionOrder': guaranteedSolutionOrder,
-      };
-
-  factory Level.fromJson(Map<String, dynamic> json) {
-    final rawArrows = (json['arrows'] as List<dynamic>)
-        .map((e) => Arrow.fromJson(e as Map<String, dynamic>))
-        .toList();
-    final sol = (json['solutionOrder'] as List<dynamic>?)
-            ?.map((e) => e as String)
-            .toList() ??
-        const [];
-    return Level(
-      number: json['number'] as int,
-      size: json['size'] as int,
-      initialArrows: rawArrows,
-      guaranteedSolutionOrder: sol,
+    return Board.fromArrows(
+      rows: rows,
+      cols: cols,
+      arrows: initialArrows,
     );
+  }
+
+  /// Calculates stars awarded based on remaining water drops (3 max).
+  static int calculateStars(int remainingDrops) {
+    if (remainingDrops >= 3) return 3;
+    if (remainingDrops == 2) return 2;
+    if (remainingDrops == 1) return 1;
+    return 0;
   }
 
   @override
   String toString() =>
-      'Level(number: $number, size: $size x $size, arrows: ${initialArrows.length})';
+      'Level($number: "$shapeName", ${rows}x$cols, arrows=${initialArrows.length})';
 }

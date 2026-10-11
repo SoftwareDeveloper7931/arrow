@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../logic/game_constants.dart';
+import '../theme/game_theme.dart';
 
 /// Handles persistent local storage of game progress, stars, hints, and user preferences.
 class StorageService {
@@ -13,6 +14,8 @@ class StorageService {
   static const String _keySoundEnabled = 'arrow_flow_sound';
   static const String _keyHapticsEnabled = 'arrow_flow_haptics';
   static const String _keyAdsRemoved = 'arrow_flow_ads_removed';
+  static const String _keyTheme = 'arrow_flow_theme';
+  static const String _keyShowDotGrid = 'arrow_flow_dot_grid';
   static const String _prefixStars = 'arrow_flow_stars_lvl_';
 
   static Future<StorageService> init() async {
@@ -92,17 +95,43 @@ class StorageService {
     await _prefs.setBool(_keyAdsRemoved, removed);
   }
 
+  GameThemeType getTheme() {
+    final name = _prefs.getString(_keyTheme);
+    if (name != null) {
+      for (final type in GameThemeType.values) {
+        if (type.name == name) return type;
+      }
+    }
+    return GameThemeType.eyeComfort;
+  }
+
+  Future<void> setTheme(GameThemeType theme) async {
+    await _prefs.setString(_keyTheme, theme.name);
+  }
+
+  bool getShowDotGrid() {
+    return _prefs.getBool(_keyShowDotGrid) ?? false;
+  }
+
+  Future<void> setShowDotGrid(bool show) async {
+    await _prefs.setBool(_keyShowDotGrid, show);
+  }
+
   /// Resets all player progression, returning back to level 1 with default hints.
   Future<void> resetProgress() async {
     final sound = isSoundEnabled();
     final haptics = isHapticsEnabled();
     final ads = isAdsRemoved();
+    final theme = getTheme();
+    final dotGrid = getShowDotGrid();
 
     await _prefs.clear();
 
     await setSoundEnabled(sound);
     await setHapticsEnabled(haptics);
     await setAdsRemoved(ads);
+    await setTheme(theme);
+    await setShowDotGrid(dotGrid);
     await setCurrentLevel(1);
     await setHighestUnlockedLevel(1);
     await setHintCount(GameConstants.defaultHintStock);

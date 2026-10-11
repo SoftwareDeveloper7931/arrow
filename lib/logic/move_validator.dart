@@ -1,92 +1,73 @@
 import '../models/arrow.dart';
 import '../models/board.dart';
 
-/// Validation result providing details on whether an arrow can exit or why it cannot.
+/// Validation result detailing whether a snake-arrow can escape or why it cannot.
 class MoveValidationResult {
-  final bool canExit;
+  final bool canEscape;
   final Arrow? blockingArrow;
-  final List<(int row, int col)> exitPath;
 
   const MoveValidationResult({
-    required this.canExit,
+    required this.canEscape,
     this.blockingArrow,
-    this.exitPath = const [],
   });
 }
 
-/// Evaluates arrow movements, raycasts paths to the edge, and detects blockers.
+/// Evaluates whether an arrow has an unobstructed straight ray from its head to the board edge.
 class MoveValidator {
   MoveValidator._();
 
-  /// Determines if [arrow] can slide off [board] without obstruction.
-  /// An arrow can exit if every cell in its pointing direction up to the boundary is empty.
-  static bool canExit(Board board, Arrow arrow) {
-    int r = arrow.row + arrow.direction.dRow;
-    int c = arrow.col + arrow.direction.dCol;
+  /// Determines if [arrow] can escape off the board.
+  ///
+  /// The straight ray from its head cell, in the head direction, to the board edge
+  /// must cross no cell occupied by any other remaining arrow.
+  static bool canEscape(Board board, Arrow arrow) {
+    int r = arrow.head.row + arrow.headDirection.dRow;
+    int c = arrow.head.col + arrow.headDirection.dCol;
 
     while (board.isInside(r, c)) {
-      if (board.arrowAt(r, c) != null) {
+      final obstacle = board.arrowAt(r, c);
+      if (obstacle != null && obstacle.id != arrow.id) {
         return false;
       }
-      r += arrow.direction.dRow;
-      c += arrow.direction.dCol;
+      r += arrow.headDirection.dRow;
+      c += arrow.headDirection.dCol;
     }
     return true;
   }
 
-  /// Locates the first blocking [Arrow] in [arrow]'s trajectory, if any.
-  /// Returns `null` if the path to the edge is unobstructed.
+  /// Locates the first blocking [Arrow] in [arrow]'s exit ray, or `null` if free.
   static Arrow? findBlockingArrow(Board board, Arrow arrow) {
-    int r = arrow.row + arrow.direction.dRow;
-    int c = arrow.col + arrow.direction.dCol;
+    int r = arrow.head.row + arrow.headDirection.dRow;
+    int c = arrow.head.col + arrow.headDirection.dCol;
 
     while (board.isInside(r, c)) {
       final obstacle = board.arrowAt(r, c);
-      if (obstacle != null) {
+      if (obstacle != null && obstacle.id != arrow.id) {
         return obstacle;
       }
-      r += arrow.direction.dRow;
-      c += arrow.direction.dCol;
+      r += arrow.headDirection.dRow;
+      c += arrow.headDirection.dCol;
     }
     return null;
   }
 
-  /// Performs full validation and calculates the cells traversed until boundary exit.
+  /// Performs full move validation.
   static MoveValidationResult validateMove(Board board, Arrow arrow) {
-    final path = <(int row, int col)>[];
-    int r = arrow.row + arrow.direction.dRow;
-    int c = arrow.col + arrow.direction.dCol;
-
-    while (board.isInside(r, c)) {
-      final obstacle = board.arrowAt(r, c);
-      if (obstacle != null) {
-        return MoveValidationResult(
-          canExit: false,
-          blockingArrow: obstacle,
-          exitPath: path,
-        );
-      }
-      path.add((r, c));
-      r += arrow.direction.dRow;
-      c += arrow.direction.dCol;
-    }
-
+    final blocker = findBlockingArrow(board, arrow);
     return MoveValidationResult(
-      canExit: true,
-      blockingArrow: null,
-      exitPath: path,
+      canEscape: blocker == null,
+      blockingArrow: blocker,
     );
   }
 
-  /// Returns all arrows on the current [board] that currently have a completely free path.
-  /// Powers the guidance (long-press) and hint selection.
-  static List<Arrow> findExitClearArrows(Board board) {
-    final clear = <Arrow>[];
+  /// Finds all arrows on the current [board] that can escape immediately.
+  static List<Arrow> findEscapableArrows(Board board) {
+    final escapable = <Arrow>[];
     for (final arrow in board.arrows) {
-      if (canExit(board, arrow)) {
-        clear.add(arrow);
+      if (canEscape(board, arrow)) {
+        escapable.add(arrow);
       }
     }
-    return clear;
+    return escapable;
   }
 }

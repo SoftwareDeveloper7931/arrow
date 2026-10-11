@@ -1,6 +1,8 @@
+import '../logic/game_constants.dart';
+import '../models/arrow.dart';
 import '../models/board.dart';
 import '../models/level.dart';
-import '../logic/game_constants.dart';
+import '../theme/game_theme.dart';
 
 enum GameStatus {
   playing,
@@ -12,10 +14,12 @@ enum GameStatus {
 class GameState {
   final Level level;
   final Board board;
-  final int hearts;
+  final int waterDrops;
   final int availableHints;
+  final bool showDotGrid;
+  final GameTheme currentTheme;
   final GameStatus status;
-  final String? animatingArrowId;
+  final Arrow? animatingArrow;
   final String? shakingArrowId;
   final String? blockingArrowId;
   final String? hintedArrowId;
@@ -25,10 +29,12 @@ class GameState {
   const GameState({
     required this.level,
     required this.board,
-    this.hearts = GameConstants.initialHearts,
+    this.waterDrops = GameConstants.initialHearts,
     this.availableHints = GameConstants.defaultHintStock,
+    this.showDotGrid = false,
+    this.currentTheme = GameTheme.eyeComfort,
     this.status = GameStatus.playing,
-    this.animatingArrowId,
+    this.animatingArrow,
     this.shakingArrowId,
     this.blockingArrowId,
     this.hintedArrowId,
@@ -44,10 +50,12 @@ class GameState {
   GameState copyWith({
     Level? level,
     Board? board,
-    int? hearts,
+    int? waterDrops,
     int? availableHints,
+    bool? showDotGrid,
+    GameTheme? currentTheme,
     GameStatus? status,
-    String? animatingArrowId,
+    Arrow? animatingArrow,
     bool clearAnimatingArrow = false,
     String? shakingArrowId,
     bool clearShakingArrow = false,
@@ -61,12 +69,14 @@ class GameState {
     return GameState(
       level: level ?? this.level,
       board: board ?? this.board,
-      hearts: hearts ?? this.hearts,
+      waterDrops: waterDrops ?? this.waterDrops,
       availableHints: availableHints ?? this.availableHints,
+      showDotGrid: showDotGrid ?? this.showDotGrid,
+      currentTheme: currentTheme ?? this.currentTheme,
       status: status ?? this.status,
-      animatingArrowId: clearAnimatingArrow
+      animatingArrow: clearAnimatingArrow
           ? null
-          : (animatingArrowId ?? this.animatingArrowId),
+          : (animatingArrow ?? this.animatingArrow),
       shakingArrowId: clearShakingArrow
           ? null
           : (shakingArrowId ?? this.shakingArrowId),

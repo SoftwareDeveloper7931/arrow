@@ -1,85 +1,88 @@
 import 'direction.dart';
 
-/// Represents a single arrow tile placed in a cell on the board.
-class Arrow {
-  final String id;
+/// Represents a single cell position on the grid.
+class Cell {
   final int row;
   final int col;
-  final Direction direction;
+
+  const Cell(this.row, this.col);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Cell &&
+          runtimeType == other.runtimeType &&
+          row == other.row &&
+          col == other.col;
+
+  @override
+  int get hashCode => Object.hash(row, col);
+
+  @override
+  String toString() => '($row, $col)';
+}
+
+/// A snake-like arrow consisting of an ordered sequence of contiguous grid cells.
+///
+/// [cells.first] is the tail (rounded line cap).
+/// [cells.last] is the head (with an arrowhead pointing in [headDirection]).
+class Arrow {
+  final String id;
+  final List<Cell> cells;
+  final Direction headDirection;
   final int colorVariant;
 
   const Arrow({
     required this.id,
-    required this.row,
-    required this.col,
-    required this.direction,
+    required this.cells,
+    required this.headDirection,
     this.colorVariant = 0,
   });
 
-  /// Factory to generate a default stable ID based on initial coordinates.
-  factory Arrow.create({
-    required int row,
-    required int col,
-    required Direction direction,
-    int colorVariant = 0,
-    String? id,
-  }) {
-    return Arrow(
-      id: id ?? 'arr_${row}_$col',
-      row: row,
-      col: col,
-      direction: direction,
-      colorVariant: colorVariant,
-    );
+  Cell get tail => cells.first;
+  Cell get head => cells.last;
+  int get length => cells.length;
+
+  bool containsCell(int r, int c) {
+    for (final cell in cells) {
+      if (cell.row == r && cell.col == c) return true;
+    }
+    return false;
   }
 
   Arrow copyWith({
     String? id,
-    int? row,
-    int? col,
-    Direction? direction,
+    List<Cell>? cells,
+    Direction? headDirection,
     int? colorVariant,
   }) {
     return Arrow(
       id: id ?? this.id,
-      row: row ?? this.row,
-      col: col ?? this.col,
-      direction: direction ?? this.direction,
+      cells: cells ?? this.cells,
+      headDirection: headDirection ?? this.headDirection,
       colorVariant: colorVariant ?? this.colorVariant,
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'row': row,
-        'col': col,
-        'direction': direction.name,
-        'colorVariant': colorVariant,
-      };
-
-  factory Arrow.fromJson(Map<String, dynamic> json) {
+  /// Reverses the arrow path: the old tail becomes the head, and vice-versa.
+  Arrow reversed({required Direction newHeadDirection}) {
     return Arrow(
-      id: json['id'] as String,
-      row: json['row'] as int,
-      col: json['col'] as int,
-      direction: Direction.fromString(json['direction'] as String),
-      colorVariant: (json['colorVariant'] as int?) ?? 0,
+      id: id,
+      cells: cells.reversed.toList(),
+      headDirection: newHeadDirection,
+      colorVariant: colorVariant,
     );
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Arrow &&
-          runtimeType == other.runtimeType &&
-          id == other.id &&
-          row == other.row &&
-          col == other.col &&
-          direction == other.direction;
+      other is Arrow && runtimeType == other.runtimeType && id == other.id;
 
   @override
-  int get hashCode => Object.hash(id, row, col, direction);
+  int get hashCode => id.hashCode;
 
   @override
-  String toString() => 'Arrow($id: ($row, $col) ${direction.symbol})';
+  String toString() =>
+      'Arrow($id: len=$length, head=$head ${headDirection.symbol})';
 }

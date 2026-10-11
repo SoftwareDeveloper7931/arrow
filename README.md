@@ -1,130 +1,138 @@
 # Arrow Flow 🏹
 
-A complete, production-quality Android puzzle game built in Flutter & Dart. **Arrow Flow** is an original arrow-clearing puzzle in the style of calm, minimalist casual games.
+An original, minimalist line-arrow puzzle game built in Flutter & Dart for Android. **Arrow Flow** features an elegant, calming aesthetic where the board consists solely of thin continuous lines forming recognizable object silhouettes.
+
+![Arrow Flow Level 1 Trophy](trophy_level_1.png)
 
 ---
 
-## 🎯 Game Concept & Mechanics
+## 🎨 Visual Aesthetics & Design
 
-A grid contains rounded arrows pointing in four cardinal directions (Up, Down, Left, Right). The player taps an arrow to slide it off the board. An arrow can only exit if every cell along its pointing direction, up to the board edge, is currently empty. Removing arrows opens lanes for other arrows, so the core challenge is discovering the correct clearance order.
-
-### Core Rules
-- **Free Path Exit**: Tapping an arrow with an unobstructed exit slides it off the board with a gentle whoosh sound and haptic response.
-- **Blocked Obstruction**: Tapping a blocked arrow triggers a shake animation, flashes the blocking obstacle, plays an error tone with haptic feedback, and deducts 1 heart for that level.
-- **Hearts**: Each level starts with 3 hearts. If all 3 hearts are lost, a "Level Failed" dialog offers **Restart** or **Watch Ad to Continue** (+2 hearts revive).
-- **Long-Press Guidance**: Holding down anywhere on the board highlights all arrows that currently have a clear path to the edge.
-- **Hints**: The hint button highlights one optimal next arrow to tap. Players start with 3 hints, and can earn +2 hints anytime via a rewarded video ad.
-- **Star Rating**:
-  - ⭐⭐⭐ (3 Stars): Cleared with 0 mistakes (all 3 hearts remaining).
-  - ⭐⭐ (2 Stars): Cleared with 1 mistake (2 hearts remaining).
-  - ⭐ (1 Star): Cleared with 2 mistakes (1 heart remaining).
-
----
-
-## 🧠 Level Generation & Mathematical Solvability
-
-Every single level is **100% guaranteed to be solvable** and deterministic.
-
-### Reverse-Placement Algorithm
-Rather than trying to generate a random board and hoping it is solvable, `LevelGenerator` builds levels **in reverse**:
-1. Starts with an empty grid of size $S \times S$.
-2. Places arrows one by one ($A_1, A_2, \dots, A_N$).
-3. When placing candidate arrow $A_k$, it must have a clear path out to the board edge with respect only to the previously placed arrows $\{A_1, \dots, A_{k-1}\}$.
-4. Candidate selection uses a **dependency bias** that intentionally places arrows in front of already placed arrows, constructing deep, interconnected puzzle chains.
-5. In forward gameplay, $A_N$ has no obstacles and can exit first, followed by $A_{N-1}$, all the way down to $A_1$. This yields a guaranteed valid solution order by construction.
-6. The generator uses `math.Random(levelNumber * 31337)` so that every level is deterministic, identical across play sessions, and requires zero network requests.
-7. Over **300 levels** are supported on demand, with difficulty scaling smoothly from $4 \times 4$ up to $10 \times 10$ grids.
-8. An in-code assertion (`assert(Solver.isSolvable(initialBoard))`) and unit tests verify all 300 levels.
+- **Pure Line-Arrow Board**: There are **NO boxes, tiles, or cells drawn**. The entire puzzle board consists strictly of thin continuous lines, 90-degree rounded turns, tail caps, and crisp arrowheads.
+- **Silhouette Form**: Lines are packed densely and tightly so that, seen together, they form a recognizable silhouette (Trophy on Level 1, Anchor, Heart, Star, Cat, Fish, Butterfly, Rocket, etc.).
+- **Themes**:
+  - 🌿 **Eye Comfort** (Default): Warm cream/beige background (`#F5EFEB`) with dark brown lines (`#2C1E18`).
+  - 🌙 **Dark**: Deep near-black background (`#14171E`) with soft luminous lines (`#7DD3FC`).
+  - 📄 **Paper**: Crisp book white background (`#FAF9F6`) with charcoal lines (`#212529`).
+  - 📜 **Sepia**: Vintage parchment (`#EFE2D0`) with rich umber lines (`#4A3425`).
+- **HUD**:
+  - **Top Bar**: Back button, Level title & silhouette name, Theme Palette picker, Settings icon.
+  - **Water Drops**: 3 blue water-drop lives (lost drops become faded/empty).
+  - **Bottom Controls**: Circular Grid-Toggle button (shows/hides faint background dot grid) and circular Hint button with an active badge counter.
+- **Zoom & Pan**: Fully centered board with `InteractiveViewer` supporting pinch-to-zoom and pan for intricate levels, with double-tap to reset.
 
 ---
 
-## 📁 Project Structure
+## 🎯 Core Mechanics
+
+1. **Snake-Arrow Paths**: Each arrow is an ordered sequence of contiguous grid cells (tail to head). The head has a straight direction continuing out from its final segment.
+2. **Escape Ray Check**: An arrow can escape only if the straight ray from its head cell, in its pointing direction, crosses no cells occupied by other remaining arrows.
+3. **Fluid Slide-Out Animation**: When tapped, an unblocked arrow slides out smoothly along its own body trail and off the board using Flutter's `PathMetrics`, accompanied by a gentle whoosh and light haptic feedback.
+4. **Obstacle Collision**: Tapping a blocked arrow deducts 1 water drop, shakes the arrow, flashes the blocking arrow in red, and plays an error tone with haptic response.
+5. **Level Fail & Revive**: If all 3 water drops are lost, a "Level Failed" dialog offers Retry or Watch Ad to Continue (+2 Drops).
+6. **Win Screen**: When all arrows are cleared, the completed silhouette outline is revealed with stars (⭐⭐⭐ for 0 mistakes, ⭐⭐ for 1, ⭐ for 2) and a Next Level button.
+7. **Hold Guidance**: Long-pressing anywhere on the board highlights all currently unblocked arrows in guidance green.
+8. **Generous Hit-Testing**: Evaluates distance from touch to nearest snake polyline segment within a comfortable tolerance (`cellSize * 0.58`), making taps responsive and effortless on mobile screens.
+
+---
+
+## 🧠 Silhouette Level Generation & Guaranteed Solvability
+
+1. **Silhouette Mask Library**: Over 40 handcrafted silhouettes (Trophy, Anchor, Heart, Star, Cat, Fish, Tree, Crown, Butterfly, Rocket, etc.) encoded as 2D boolean masks.
+2. **Random-Walk Path Partitioning**: Every active cell of the silhouette mask is covered by a snake-like path with 90-degree turns using Warnsdorff-inspired heuristics. 100% mask cell coverage with zero gaps or overlaps.
+3. **Acyclic Dependency Orientation**: Head directions are oriented outward with intelligent cycle-breaking and head-flipping algorithms, ensuring a valid monotone removal order exists.
+4. **Deterministic Generation**: Every level is deterministically derived from its level number (`seed = levelNumber`), generating smoothly across 300+ levels from $12 \times 12$ up to $36 \times 36$ grids offline.
+5. **Built-in Solver**: Topological peeling solver verifies that every generated level is 100% solvable and powers optimal hints.
+
+---
+
+## 📁 Architecture & File Structure
 
 ```
 arrow_flow/
-├── android/                   # Native Android host configuration (portrait locked)
+├── android/                   # Native Android configuration (portrait locked)
 ├── assets/
-│   └── audio/                 # Sound effects (whoosh, tap, error, win)
+│   └── audio/                 # Sound effects (whoosh.wav, tap.wav, error.wav, win.wav)
 ├── lib/
 │   ├── logic/
-│   │   ├── game_constants.dart  # Centralized limits, timings, and ad cadence
-│   │   ├── level_generator.dart # Seeded reverse placement level generator
-│   │   ├── move_validator.dart  # Raycasting, obstacle detection, exit clearance
-│   │   └── solver.dart          # Monotone greedy solver & optimal hint engine
+│   │   ├── game_constants.dart    # Timings, drop counts, and ad frequencies
+│   │   ├── level_generator.dart   # Deterministic silhouette generator & cycle repair
+│   │   ├── move_validator.dart    # Straight escape raycasting & obstacle detection
+│   │   ├── path_partitioner.dart  # 100% random-walk path cover of silhouette masks
+│   │   ├── shape_library.dart     # 40+ iconic silhouette masks (Level 1: Trophy)
+│   │   └── solver.dart            # Topological peeling solver & hint generator
 │   ├── models/
-│   │   ├── arrow.dart           # Arrow entity, coordinates, direction, color
-│   │   ├── board.dart           # 2D cell grid, ray queries, immutable copies
-│   │   ├── direction.dart       # Cardinal directions, angles, offsets
-│   │   └── level.dart           # Level configuration & star calculation
+│   │   ├── arrow.dart             # Snake polyline model (tail, head, cells, direction)
+│   │   ├── board.dart             # Fast 2D lookup matrix & immutable state
+│   │   ├── direction.dart         # Cardinal vectors, rotations & offsets
+│   │   ├── level.dart             # Level metadata, dimensions & mask
+│   │   └── shape_mask.dart        # 2D boolean mask & resampling logic
 │   ├── services/
-│   │   ├── ads_service.dart     # Ads abstraction (interstitials, rewarded, IAP)
-│   │   ├── audio_service.dart   # AudioPlayer & HapticFeedback with graceful fallbacks
-│   │   └── storage_service.dart # SharedPreferences for progress, stars & settings
+│   │   ├── ads_service.dart       # Monetization abstraction (interstitials, rewarded)
+│   │   ├── audio_service.dart     # Audio playback & haptic feedback with test mode
+│   │   └── storage_service.dart   # SharedPreferences for progress, themes & settings
 │   ├── state/
-│   │   ├── game_controller.dart # Riverpod StateNotifier for game flow & animations
-│   │   ├── game_state.dart      # Immutable game state
-│   │   └── providers.dart       # Dependency injection & providers
+│   │   ├── game_controller.dart   # Riverpod controller managing interactions & animations
+│   │   ├── game_state.dart        # Immutable game state model
+│   │   └── providers.dart         # Dependency injection providers
 │   ├── theme/
-│   │   ├── app_colors.dart      # Calm pastel/neutral light & dark color palettes
-│   │   └── app_theme.dart       # Material 3 typography & shape definitions
+│   │   ├── app_colors.dart        # UI palette accents
+│   │   ├── app_theme.dart         # Material 3 theme data
+│   │   └── game_theme.dart        # Eye Comfort, Dark, Paper, and Sepia themes
 │   ├── ui/
-│   │   ├── dialogs/             # WinDialog, FailDialog, HintRewardDialog
-│   │   ├── screens/             # HomeScreen, GameScreen, SettingsScreen
-│   │   └── widgets/             # BoardWidget, ArrowTile, ArrowPainter, Hearts, Stars
-│   └── main.dart                # App entrypoint, portrait orientation lock, Riverpod scope
+│   │   ├── dialogs/               # WinDialog, FailDialog, HintRewardDialog
+│   │   ├── screens/               # GameScreen, HomeScreen, SettingsScreen
+│   │   └── widgets/               # BoardPainter, BoardWidget, WaterDrops, Outline
+│   └── main.dart                  # Application entrypoint & Riverpod ProviderScope
 └── test/
     ├── logic/
-    │   ├── level_generator_test.dart # Solvability test across levels 1–300
-    │   ├── move_validator_test.dart  # Raycast & blocker tests
-    │   └── solver_test.dart          # Solution order & dead-end detection tests
-    └── widget_test.dart              # Home screen UI smoke test
+    │   ├── level_generator_test.dart  # Solvability verification across levels
+    │   ├── move_validator_test.dart   # Raycast validation tests
+    │   ├── path_partitioner_test.dart # 100% mask coverage verification
+    │   └── solver_test.dart           # Solution ordering and cycle tests
+    ├── gameplay_test.dart             # Complete interactive gameplay test
+    ├── screenshot_test.dart           # Trophy silhouette snapshot test
+    └── widget_test.dart               # App smoke test
 ```
 
 ---
 
-## 💰 Monetization Hooks (Production Integration Guide)
+## 💰 Monetization Integration Guide
 
-The game includes a dedicated `AdsService` abstraction (`lib/services/ads_service.dart`) following non-intrusive monetization standards:
-- **No ads before level 5**.
-- **Never during gameplay** (only after level completion).
-- **Interstitial Cadence**: Shown every 3 completed levels (e.g. Levels 6, 9, 12, ...), automatically bypassed if "Remove Ads" is purchased.
-- **Rewarded Video Ads**: Available on-demand for +2 hints or to revive on level fail (+2 hearts).
+The game includes a production-ready `AdsService` abstraction (`lib/services/ads_service.dart`):
+- **Interstitial Cadence**: Displayed every 3 completed levels, never before level 5, never during active gameplay. Bypassed if ads are removed.
+- **Rewarded Ads**: Available on demand for +2 hints or to revive upon losing all water drops.
 
-### To plug in `google_mobile_ads`:
+### Plugging in `google_mobile_ads`:
 1. Add `google_mobile_ads: ^5.2.0` to `pubspec.yaml`.
-2. Add your AdMob App ID in `android/app/src/main/AndroidManifest.xml`:
+2. Add your AdMob App ID to `android/app/src/main/AndroidManifest.xml`:
    ```xml
    <meta-data
        android:name="com.google.android.gms.ads.APPLICATION_ID"
        android:value="ca-app-pub-################~##########"/>
    ```
-3. In `lib/services/ads_service.dart`, replace the mock calls inside `showInterstitial()` and `showRewarded()` with `InterstitialAd.load` and `RewardedAd.load`.
+3. In `lib/services/ads_service.dart`, connect `InterstitialAd.load()` and `RewardedAd.load()` in place of mock triggers.
 
-### To plug in `in_app_purchase`:
+### Plugging in `in_app_purchase`:
 1. Add `in_app_purchase: ^3.2.0` to `pubspec.yaml`.
-2. In `lib/services/ads_service.dart`, implement `purchaseRemoveAds()` using `InAppPurchase.instance.buyNonConsumable()` targeting product ID `remove_ads`.
-3. When the purchase completes, call `await _storageService.setAdsRemoved(true)`.
+2. In `lib/services/ads_service.dart`, link `InAppPurchase.instance.buyNonConsumable()` for product ID `remove_ads`.
+3. Call `await _storageService.setAdsRemoved(true)` upon transaction approval.
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Running & Building
 
-### Prerequisites
-- Flutter SDK `^3.13.0` (Dart `^3.0.0`)
-- Android Studio / Android SDK (API 34+)
-
-### Run Tests
+### Run All Unit and Integration Tests
 ```bash
 flutter test
 ```
-All 11 tests will execute, validating `MoveValidator`, `Solver`, `ArrowFlowApp` UI, and confirming **100% solvability for all 300 levels**.
 
-### Run Linter
+### Static Analysis
 ```bash
 flutter analyze
 ```
 
-### Run Locally on Android Device / Emulator
+### Run Locally (Android / Chrome / Desktop)
 ```bash
 flutter run
 ```

@@ -1,117 +1,99 @@
 import 'arrow.dart';
 
-/// Represents the N x N grid of the puzzle board.
+/// Represents the 2D grid containing silhouette snake-arrows.
 class Board {
-  final int size;
-  final List<List<Arrow?>> _cells;
+  final int rows;
+  final int cols;
+  final List<Arrow> arrows;
+  final List<List<Arrow?>> _cellToArrow;
 
-  Board._(this.size, this._cells);
+  Board._(
+    this.rows,
+    this.cols,
+    this.arrows,
+    this._cellToArrow,
+  );
 
-  /// Creates an empty board of dimension [size] x [size].
-  factory Board.empty(int size) {
-    return Board._(
-      size,
-      List.generate(size, (_) => List<Arrow?>.filled(size, null)),
-    );
-  }
+  /// Creates a board from a list of snake arrows.
+  factory Board.fromArrows({
+    required int rows,
+    required int cols,
+    required Iterable<Arrow> arrows,
+  }) {
+    final cellToArrow =
+        List.generate(rows, (_) => List<Arrow?>.filled(cols, null));
 
-  /// Creates a board populated with the provided [arrows].
-  factory Board.fromArrows(int size, Iterable<Arrow> arrows) {
-    final cells = List.generate(size, (_) => List<Arrow?>.filled(size, null));
     for (final arrow in arrows) {
-      if (arrow.row >= 0 &&
-          arrow.row < size &&
-          arrow.col >= 0 &&
-          arrow.col < size) {
-        cells[arrow.row][arrow.col] = arrow;
+      for (final cell in arrow.cells) {
+        if (cell.row >= 0 &&
+            cell.row < rows &&
+            cell.col >= 0 &&
+            cell.col < cols) {
+          cellToArrow[cell.row][cell.col] = arrow;
+        }
       }
     }
-    return Board._(size, cells);
+
+    return Board._(
+      rows,
+      cols,
+      List.unmodifiable(arrows),
+      cellToArrow,
+    );
   }
 
-  /// Returns the arrow located at [row], [col], or null if empty or out of bounds.
-  Arrow? arrowAt(int row, int col) {
-    if (!isInside(row, col)) return null;
-    return _cells[row][col];
+  /// Factory for an empty board.
+  factory Board.empty(int rows, int cols) {
+    return Board._(
+      rows,
+      cols,
+      const [],
+      List.generate(rows, (_) => List<Arrow?>.filled(cols, null)),
+    );
   }
 
-  /// Checks if [row], [col] is within the grid boundaries.
-  bool isInside(int row, int col) {
-    return row >= 0 && row < size && col >= 0 && col < size;
+  bool isInside(int r, int c) {
+    return r >= 0 && r < rows && c >= 0 && c < cols;
   }
 
-  /// Checks if [row], [col] is valid and has no arrow.
-  bool isCellEmpty(int row, int col) {
-    return isInside(row, col) && _cells[row][col] == null;
+  Arrow? arrowAt(int r, int c) {
+    if (!isInside(r, c)) return null;
+    return _cellToArrow[r][c];
   }
 
-  /// Returns an unmodifiable list of all remaining arrows on the board.
-  List<Arrow> get arrows {
-    final list = <Arrow>[];
-    for (int r = 0; r < size; r++) {
-      for (int c = 0; c < size; c++) {
-        final a = _cells[r][c];
-        if (a != null) list.add(a);
-      }
-    }
-    return list;
+  bool isOccupied(int r, int c) {
+    return arrowAt(r, c) != null;
   }
 
-  /// Total number of remaining arrows.
-  int get remainingCount {
-    int count = 0;
-    for (int r = 0; r < size; r++) {
-      for (int c = 0; c < size; c++) {
-        if (_cells[r][c] != null) count++;
-      }
-    }
-    return count;
-  }
+  int get remainingCount => arrows.length;
+  bool get isCleared => arrows.isEmpty;
 
-  /// True if all arrows have been cleared.
-  bool get isCleared => remainingCount == 0;
-
-  /// Returns a new Board with the given [arrow] removed.
+  /// Returns a new Board with [arrow] removed.
   Board removeArrow(Arrow arrow) {
-    final newCells = List.generate(
-      size,
-      (r) => List<Arrow?>.from(_cells[r]),
-    );
-    if (isInside(arrow.row, arrow.col)) {
-      newCells[arrow.row][arrow.col] = null;
-    }
-    return Board._(size, newCells);
-  }
+    final newArrows = arrows.where((a) => a.id != arrow.id).toList();
+    final newCellToArrow =
+        List.generate(rows, (r) => List<Arrow?>.from(_cellToArrow[r]));
 
-  /// Returns a new Board with the given [arrow] placed.
-  Board withArrow(Arrow arrow) {
-    final newCells = List.generate(
-      size,
-      (r) => List<Arrow?>.from(_cells[r]),
-    );
-    if (isInside(arrow.row, arrow.col)) {
-      newCells[arrow.row][arrow.col] = arrow;
+    for (final cell in arrow.cells) {
+      if (isInside(cell.row, cell.col)) {
+        newCellToArrow[cell.row][cell.col] = null;
+      }
     }
-    return Board._(size, newCells);
+
+    return Board._(
+      rows,
+      cols,
+      List.unmodifiable(newArrows),
+      newCellToArrow,
+    );
   }
 
   Board clone() {
     return Board._(
-      size,
-      List.generate(size, (r) => List<Arrow?>.from(_cells[r])),
+      rows,
+      cols,
+      List.unmodifiable(arrows),
+      List.generate(rows, (r) => List<Arrow?>.from(_cellToArrow[r])),
     );
-  }
-
-  @override
-  String toString() {
-    final buffer = StringBuffer('Board($size x $size):\n');
-    for (int r = 0; r < size; r++) {
-      for (int c = 0; c < size; c++) {
-        final a = _cells[r][c];
-        buffer.write(a != null ? '${a.direction.symbol} ' : '. ');
-      }
-      buffer.writeln();
-    }
-    return buffer.toString();
   }
 }

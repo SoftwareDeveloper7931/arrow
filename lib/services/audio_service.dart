@@ -4,20 +4,25 @@ import 'package:flutter/services.dart';
 
 /// Provides audio playback and tactile haptic feedback for game events.
 class AudioService {
-  final AudioPlayer _player = AudioPlayer();
+  AudioPlayer? _player;
   bool soundEnabled;
   bool hapticsEnabled;
+  final bool isTestMode;
 
   AudioService({
     this.soundEnabled = true,
     this.hapticsEnabled = true,
+    this.isTestMode = false,
   }) {
-    _initPlayer();
+    if (!isTestMode) {
+      _initPlayer();
+    }
   }
 
   void _initPlayer() {
     try {
-      _player.setAudioContext(
+      _player = AudioPlayer();
+      _player!.setAudioContext(
         AudioContext(
           android: const AudioContextAndroid(
             isSpeakerphoneOn: false,
@@ -31,7 +36,7 @@ class AudioService {
           ),
         ),
       );
-      _player.setReleaseMode(ReleaseMode.stop);
+      _player?.setReleaseMode(ReleaseMode.stop);
     } catch (e) {
       debugPrint('AudioService: context init warning: $e');
     }
@@ -39,10 +44,10 @@ class AudioService {
 
   /// Plays an asset sound file gracefully without interrupting the game loop if missing.
   Future<void> _playSound(String assetFileName) async {
-    if (!soundEnabled) return;
+    if (!soundEnabled || isTestMode || _player == null) return;
     try {
-      await _player.stop();
-      await _player.play(AssetSource('audio/$assetFileName'), volume: 0.6);
+      await _player!.stop();
+      await _player!.play(AssetSource('audio/$assetFileName'), volume: 0.6);
     } catch (e) {
       debugPrint('AudioService: Failed to play $assetFileName (handled gracefully): $e');
     }
@@ -99,6 +104,6 @@ class AudioService {
   }
 
   void dispose() {
-    _player.dispose();
+    _player?.dispose();
   }
 }

@@ -1,66 +1,69 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
+import '../../theme/game_theme.dart';
 
 class FailDialog extends StatelessWidget {
   final int levelNumber;
+  final GameTheme theme;
   final VoidCallback onRetry;
   final VoidCallback onWatchAdContinue;
 
   const FailDialog({
     super.key,
     required this.levelNumber,
+    required this.theme,
     required this.onRetry,
     required this.onWatchAdContinue,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      backgroundColor: theme.backgroundColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+        side: BorderSide(
+          color: theme.lineColor.withValues(alpha: 0.15),
+          width: 1.5,
+        ),
+      ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.heartRed.withValues(alpha: 0.12),
+                color: theme.errorFlashColor.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.heart_broken_rounded,
-                color: AppColors.heartRed,
-                size: 44,
+              child: Icon(
+                Icons.water_drop_outlined,
+                color: theme.errorFlashColor,
+                size: 40,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
             Text(
-              'Out of Hearts',
+              'Level Failed',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
                 letterSpacing: -0.4,
-                color: isDark
-                    ? AppColors.darkTextPrimary
-                    : AppColors.lightTextPrimary,
+                color: theme.textPrimaryColor,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
-              'Level $levelNumber. Look closely at the arrow paths before tapping.',
+              'Out of water drops. Trace the straight escape rays carefully before tapping.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightTextSecondary,
+                color: theme.textSecondaryColor,
               ),
             ),
-            const SizedBox(height: 28),
-            // Watch Ad to Continue Button
+            const SizedBox(height: 24),
+            // Watch Ad to Continue Button (placeholder)
             SizedBox(
               width: double.infinity,
               height: 52,
@@ -68,12 +71,12 @@ class FailDialog extends StatelessWidget {
                 onPressed: onWatchAdContinue,
                 icon: const Icon(Icons.play_circle_outline_rounded, size: 22),
                 label: const Text(
-                  'Watch Ad to Continue (+2 Hearts)',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  'Watch Ad to Continue (+2 Drops)',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primarySage,
-                  foregroundColor: Colors.white,
+                  backgroundColor: theme.lineColor,
+                  foregroundColor: theme.backgroundColor,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -81,7 +84,7 @@ class FailDialog extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             // Retry Button
             SizedBox(
               width: double.infinity,
@@ -89,21 +92,17 @@ class FailDialog extends StatelessWidget {
               child: OutlinedButton(
                 onPressed: onRetry,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: isDark
-                      ? AppColors.darkTextPrimary
-                      : AppColors.lightTextPrimary,
+                  foregroundColor: theme.textPrimaryColor,
                   side: BorderSide(
-                    color: isDark
-                        ? const Color(0xFF2E3442)
-                        : const Color(0xFFE2E8F0),
+                    color: theme.lineColor.withValues(alpha: 0.25),
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
                 child: const Text(
-                  'Restart Level',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  'Retry Level',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
